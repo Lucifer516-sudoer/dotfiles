@@ -1,250 +1,728 @@
-#!/usr/bin/env bash
-# install.sh — bootstrap your dotfiles on Arch-like systems (Paru/pacman)
-# Drop into your dotfiles repo (e.g. ~/dev/dotfiles) and run.
-# Usage:
-#   ./install.sh           -> normal run (will ask to continue on destructive steps)
-#   ./install.sh --yes     -> noninteractive, assume yes
-#   ./install.sh --dry     -> dry-run (shows actions but doesn't change files)
+#!/bin/bash
+# install.sh - GNU Stow-based dotfiles installer
+# Safely deploys user dotfiles from repo to home directory with backup, safety checks, and idempotency.
+# Usage: ./install.sh [--dry-run] [--target <home|config|both>] [--pkg-install yes|no] [--force] [--yes] [--log <file>]
 
 set -euo pipefail
-IFS=$'\n\t'
 
-#####################
-# Configuration
-#####################
-DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dev/dotfiles}"   # where your repo lives
-STOW_TARGET="${STOW_TARGET:-$HOME}"                  # where stow will place symlinks
-BACKUP_DIR="${BACKUP_DIR:-$HOME/.dotfiles-backup-$(date +%Y%m%d-%H%M%S)}"
-PKG_MANAGER=""
-NONINTERACTIVE=0
-DRY_RUN=0
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-# list packages you want installed by default (adjust for your workflow)
-# keep package names generic; user may need to edit to match their AUR/package names
-PACKAGES=(
-  "hyprland"      # hyprland compositor
-  "wl-clipboard"  # wl-copy wl-paste
-  "wlroots"       # if needed by your compositor (name may vary)
-  "kitty"         # terminal
-  "thunar"        # file manager
-  "fuzzel"        # launcher used in examples
-  "cliphist"      # clipboard manager used in examples
-  "grim"          # screenshots
-  "slurp"         # selection
-  "brightnessctl"
-  "playerctl"
-  "pipewire"      # audio (if not present)
-  "pipewire-pulse"
-  "wireplumber"
-  "stow"
-  "git"
-  "bash"
-)
+# Global configuration
+DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dev/dotfiles}"
+STOW_TARGET="${STOW_TARGET:-$HOME}"
+DRY_RUN=false
+FORCE=false
+YES_FLAG=false
+PKG_INSTALL=false
+LOG_FILE=""
+BACKUP_DIR="$HOME/.local/share/dotfiles-backups"
+LOG_DIR="$HOME/.local/share/dotfiles-installer/logs"
+PKG_MGR=""
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
-# packages that are AUR-only (paru installs AUR) — adjust if you use different AUR names
-AUR_PACKAGES=(
-  "caelestia-cli" # Caelestia CLI (may be AUR package name; adjust if different)
-  "calestia-shell-git"
-  # Place AUR names here if you want to install via paru
-  # e.g. "caelestia-cli" if it's AUR; else keep empty
-)
+# Arrays to track actions
+PACKAGES_TO_STOW=()
+BACKUPS_MADE=()
 
-#####################
-# Helpers
-#####################
-echoinfo(){ printf '\e[1;36m%s\e[0m\n' "$*"; }
-echowarn(){ printf '\e[1;33m%s\e[0m\n' "$*"; }
-echoerr(){ printf '\e[1;31m%s\e[0m\n' "$*"; }
+# ============================================================================
+# Logging and output functions
+# ============================================================================
 
-confirm_or_die(){
-  if [ "$NONINTERACTIVE" -eq 1 ]; then
-    return 0
-  fi
-  read -r -p "$1 [y/N] " ans
-  case "$ans" in
-    [Yy]*) return 0 ;;
-    *) echo "Aborted."; exit 1 ;;
-  esac
-}
-
-detect_pkg_manager(){
-  if command -v paru >/dev/null 2>&1; then
-    PKG_MANAGER="paru"
-  elif command -v yay >/dev/null 2>&1; then
-    PKG_MANAGER="yay"
-  elif command -v pacman >/dev/null 2>&1; then
-    PKG_MANAGER="pacman"
-  else
-    echoerr "No supported package manager found (paru/yay/pacman). Install one first."
-    exit 1
-  fi
-  echoinfo "Using package manager: $PKG_MANAGER"
-}
-
-install_packages(){
-  echoinfo "Installing packages (may ask for sudo)..."
-  if [ "$DRY_RUN" -eq 1 ]; then
-    printf "DRY RUN: would install: %s\n" "${PACKAGES[*]}"
-    return
-  fi
-
-  if [ "$PKG_MANAGER" = "paru" ] || [ "$PKG_MANAGER" = "yay" ]; then
-    "$PKG_MANAGER" -S --noconfirm --needed "${PACKAGES[@]}" || echowarn "Some packages failed to install — check output"
-    if [ "${#AUR_PACKAGES[@]}" -gt 0 ]; then
-      "$PKG_MANAGER" -S --noconfirm --needed "${AUR_PACKAGES[@]}" || echowarn "Some AUR packages failed"
+log() {
+    local msg="$1"
+    echo -e "${BLUE}[INFO]${NC} $msg"
+    if [[ -n "$LOG_FILE" ]]; then
+        printf '[%s] [INFO] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$msg" >> "$LOG_FILE"
     fi
-  else
-    # pacman
-    sudo pacman -Syu --noconfirm --needed "${PACKAGES[@]}" || echowarn "pacman install failed for some packages"
-    if [ "${#AUR_PACKAGES[@]}" -gt 0 ]; then
-      echowarn "AUR packages present but no AUR helper found. Install manually: ${AUR_PACKAGES[*]}"
-    fi
-  fi
 }
 
-ensure_dotfiles_repo(){
-  if [ ! -d "$DOTFILES_DIR/.git" ]; then
-    echoinfo "No dotfiles repo found at $DOTFILES_DIR"
-    if [ "$DRY_RUN" -eq 1 ]; then
-      echoinfo "DRY RUN: Would git clone your repo into $DOTFILES_DIR"
-    else
-      read -r -p "Clone your dotfiles repo into $DOTFILES_DIR? (enter Git URL or leave empty to abort) " url
-      if [ -z "$url" ]; then
-        echo "No URL provided. Exiting."
+log_success() {
+    local msg="$1"
+    echo -e "${GREEN}[✓]${NC} $msg"
+    if [[ -n "$LOG_FILE" ]]; then
+        printf '[%s] [SUCCESS] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$msg" >> "$LOG_FILE"
+    fi
+}
+
+log_warn() {
+    local msg="$1"
+    echo -e "${YELLOW}[WARN]${NC} $msg"
+    if [[ -n "$LOG_FILE" ]]; then
+        printf '[%s] [WARN] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$msg" >> "$LOG_FILE"
+    fi
+}
+
+log_error() {
+    local msg="$1"
+    echo -e "${RED}[ERROR]${NC} $msg"
+    if [[ -n "$LOG_FILE" ]]; then
+        printf '[%s] [ERROR] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$msg" >> "$LOG_FILE"
+    fi
+}
+
+# ============================================================================
+# Utility functions
+# ============================================================================
+
+# Prompt user for confirmation (respects --yes flag)
+prompt_confirm() {
+    local msg="$1"
+    if [[ "$YES_FLAG" == true ]]; then
+        log "$msg - auto-confirmed with --yes"
+        return 0
+    fi
+    read -p "$(echo -e "${YELLOW}?${NC} $msg (y/n) ")" -n 1 -r
+    echo
+    [[ $REPLY =~ ^[Yy]$ ]]
+}
+
+# Create backup directory and return backup path
+create_backup() {
+    local source_path="$1"
+    local backup_subdir="$BACKUP_DIR/$TIMESTAMP"
+    mkdir -p "$backup_subdir"
+    echo "$backup_subdir"
+}
+
+# Back up a file or directory before overwriting
+backup() {
+    local source_path="$1"
+    local target_name="${source_path##*/}"
+
+    if [[ ! -e "$source_path" ]]; then
+        return 0
+    fi
+
+    local backup_path
+    backup_path=$(create_backup "$source_path")
+
+    # Create unique backup filename to avoid collisions
+    local unique_name="${target_name}_$(date +%s%N)"
+    log "Backing up '$source_path' to '$backup_path/$unique_name'"
+    cp -r "$source_path" "$backup_path/$unique_name"
+    BACKUPS_MADE+=("$source_path -> $backup_path/$unique_name")
+}
+
+# Check if a command exists
+command_exists() {
+    command -v "$1" &> /dev/null
+}
+
+# ============================================================================
+# Preflight checks
+# ============================================================================
+
+preflight_checks() {
+    log "Running preflight checks..."
+    
+    # Ensure not running as root
+    if [[ $EUID -eq 0 ]]; then
+        log_error "This script must not be run as root. Exiting."
         exit 1
-      fi
-      git clone "$url" "$DOTFILES_DIR"
     fi
-  else
-    echoinfo "Dotfiles repo present: $DOTFILES_DIR"
-  fi
-}
-
-backup_conf_if_exists(){
-  local target="$1"
-  if [ -e "$target" ] || [ -L "$target" ]; then
-    mkdir -p "$BACKUP_DIR"
-    echoinfo "Backing up $target -> $BACKUP_DIR/"
-    if [ "$DRY_RUN" -eq 1 ]; then
-      echo "DRY RUN: would mv $target $BACKUP_DIR/"
-    else
-      mv "$target" "$BACKUP_DIR/"
+    log_success "Not running as root"
+    
+    # Verify dotfiles directory exists
+    if [[ ! -d "$DOTFILES_DIR" ]]; then
+        log_error "Dotfiles directory not found: $DOTFILES_DIR"
+        exit 1
     fi
-  fi
-}
-
-stow_packages(){
-  echoinfo "Stowing packages from $DOTFILES_DIR into $STOW_TARGET"
-  pushd "$DOTFILES_DIR" >/dev/null
-  for pkg in */; do
-    pkg="${pkg%/}"
-    # skip .git and README
-    if [[ "$pkg" = ".git" || "$pkg" = "README.md" || "$pkg" = "install.sh" ]]; then
-      continue
-    fi
-    # only stow directories that look like packages (has .config or bin)
-    if [ -d "$pkg" ]; then
-      if [ -d "$pkg/.config" ] || [ -d "$pkg/bin" ] || [ -d "$pkg/.local" ]; then
-        echoinfo "-> Stow: $pkg"
-        if [ "$DRY_RUN" -eq 1 ]; then
-          echo "DRY RUN: stow -t $STOW_TARGET $pkg"
+    log_success "Dotfiles directory found: $DOTFILES_DIR"
+    
+    # Check if stow is installed
+    if ! command_exists stow; then
+        log_warn "GNU stow is not installed."
+        if [[ "$PKG_INSTALL" == true ]]; then
+            log "Attempting to install stow..."
+            install_stow
         else
-          # ensure no pre-existing path would conflict: if target path exists, back it up
-          # get top-level entries inside package to check conflicts
-          while read -r entry; do
-            # only check top-level entries
-            target_path="$STOW_TARGET/${entry#.}"
-            if [ -e "$target_path" ] && [ ! -L "$target_path" ]; then
-              backup_conf_if_exists "$target_path"
-            fi
-          done < <(find "$pkg" -maxdepth 2 -mindepth 1 -printf "%P\n" | sed -n '1,100p' | awk -F/ '{print $1}' | sort -u)
-          stow -t "$STOW_TARGET" "$pkg"
+            log_error "stow is required. Please install it or use --pkg-install yes"
+            exit 1
         fi
-      fi
+    else
+        log_success "stow is installed"
     fi
-  done
-  popd >/dev/null
-}
-
-fix_permissions(){
-  # make scripts executable
-  echoinfo "Making scripts in $DOTFILES_DIR/*/scripts and */bin executable"
-  if [ "$DRY_RUN" -eq 1 ]; then
-    echo "DRY RUN: chmod +x on scripts"
-    return
-  fi
-  find "$DOTFILES_DIR" -type d \( -name "scripts" -o -name "bin" \) -prune -print0 2>/dev/null | while IFS= read -r -d '' d; do
-    find "$d" -type f -print0 | xargs -0 chmod +x || true
-  done
-}
-
-enable_user_services(){
-  # optional: enable/popular services. Don't blindly enable critical services — let user confirm.
-  echoinfo "User service enabling step. Recommended: enable pipewire/wireplumber if used."
-  if [ "$NONINTERACTIVE" -eq 0 ]; then
-    read -r -p "Enable pipewire (systemctl --user enable --now pipewire pipewire-pulse wireplumber)? [y/N] " ans
-    if [[ "$ans" =~ ^[Yy]$ ]]; then
-      systemctl --user enable --now pipewire pipewire-pulse wireplumber || echowarn "Failed to enable pipewire services (run manually)"
+    
+    # Detect package manager
+    detect_pkg_mgr
+    log_success "Package manager: $PKG_MGR"
+    
+    # Log file setup
+    if [[ -n "$LOG_FILE" ]]; then
+        mkdir -p "$(dirname "$LOG_FILE")"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Install script started" >> "$LOG_FILE"
+        log "Logging to: $LOG_FILE"
     fi
-  fi
 }
 
-print_post_install(){
-  cat <<'EOF'
-
-INSTALL COMPLETE (partial) — next steps:
-
-1. If you changed autostart or your compositor, restart your session or run:
-   hyprctl reload
-
-2. Test Caelestia commands:
-   caelestia shell drawers list
-   caelestia shell drawers toggle launcher
-
-3. If you mapped a tap->F13 or interception trick, follow the extra setup steps in README.
-
-4. Verify packages and AUR installs manually if anything failed.
-
-EOF
+# Detect which package manager is available
+detect_pkg_mgr() {
+    if command_exists paru; then
+        PKG_MGR="paru"
+    elif command_exists yay; then
+        PKG_MGR="yay"
+    elif command_exists pacman; then
+        PKG_MGR="pacman"
+    elif command_exists apt; then
+        PKG_MGR="apt"
+    elif command_exists dnf; then
+        PKG_MGR="dnf"
+    else
+        log_warn "No supported package manager detected: paru, yay, pacman, apt, dnf"
+        PKG_MGR=""
+    fi
 }
 
-#####################
-# Parse args
-#####################
-for arg in "$@"; do
-  case "$arg" in
-    --yes|-y) NONINTERACTIVE=1 ;;
-    --dry) DRY_RUN=1 ;;
-    --help|-h) echo "usage: $0 [--yes|-y] [--dry]" ; exit 0 ;;
-  esac
-done
+# Install stow using detected package manager
+install_stow() {
+    case "$PKG_MGR" in
+        paru|yay)
+            log "Installing stow via $PKG_MGR..."
+            "$PKG_MGR" -S --noconfirm stow || log_error "Failed to install stow"
+            ;;
+        pacman)
+            log "Installing stow via pacman requires sudo..."
+            sudo pacman -S --noconfirm stow || log_error "Failed to install stow"
+            ;;
+        apt)
+            log "Installing stow via apt requires sudo..."
+            sudo apt-get update && sudo apt-get install -y stow || log_error "Failed to install stow"
+            ;;
+        dnf)
+            log "Installing stow via dnf requires sudo..."
+            sudo dnf install -y stow || log_error "Failed to install stow"
+            ;;
+        *)
+            log_error "Cannot auto-install stow on this system. Please install manually."
+            exit 1
+            ;;
+    esac
+}
 
-#####################
-# Main
-#####################
-echoinfo "Dotfiles install starting. DOTFILES_DIR=$DOTFILES_DIR, STOW_TARGET=$STOW_TARGET"
-detect_pkg_manager
-ensure_dotfiles_repo
+# ============================================================================
+# Package detection and stow logic
+# ============================================================================
 
-# Offer to install base packages
-if [ "$NONINTERACTIVE" -eq 0 ]; then
-  echo
-  echoinfo "Package list preview: ${PACKAGES[*]}"
-  confirm_or_die "Install packages listed above? (requires sudo or AUR helper)"
-fi
+# Detect all packages in DOTFILES_DIR that should be stowed
+detect_packages() {
+    log "Detecting packages in $DOTFILES_DIR..."
+    local packages=()
+    
+    # List top-level directories in DOTFILES_DIR
+    while IFS= read -r -d '' pkg_dir; do
+        local pkg_name
+        pkg_name=$(basename "$pkg_dir")
+        
+        # Skip hidden files and non-directories
+        [[ "$pkg_name" == .* ]] && continue
+        [[ ! -d "$pkg_dir" ]] && continue
+        
+        # Check if package has stow-relevant content: .config, bin, .local, or top-level dotfiles
+        if has_stow_content "$pkg_dir"; then
+            packages+=("$pkg_name")
+            log "Detected package: $pkg_name"
+        fi
+    done < <(find "$DOTFILES_DIR" -maxdepth 1 -type d -print0 | grep -zv "^\.$")
+    
+    PACKAGES_TO_STOW=("${packages[@]}")
+}
 
-install_packages
+# Check if a package directory has stow-relevant content
+has_stow_content() {
+    local pkg_dir="$1"
+    
+    # Check for .config subdirectory (most common)
+    [[ -d "$pkg_dir/.config" ]] && return 0
+    
+    # Check for bin directory
+    [[ -d "$pkg_dir/bin" ]] && return 0
+    
+    # Check for .local directory
+    [[ -d "$pkg_dir/.local" ]] && return 0
+    
+    # Check for top-level dotfiles (e.g., .zshrc, .gitconfig)
+    local has_dotfile=false
+    while IFS= read -r -d '' file; do
+        [[ -f "$file" && "${file##*/}" == .* ]] && has_dotfile=true && break
+    done < <(find "$pkg_dir" -maxdepth 1 -type f -print0 2>/dev/null)
+    [[ "$has_dotfile" == true ]] && return 0
+    
+    return 1
+}
 
-# Back up home dotfiles we will override (only high-level)
-backup_conf_if_exists "$HOME/.config"
-backup_conf_if_exists "$HOME/.local/bin"
-backup_conf_if_exists "$HOME/.bashrc" || true
-backup_conf_if_exists "$HOME/.profile" || true
-backup_conf_if_exists "$HOME/.zshrc" || true
+# Determine stow target for a given package
+get_stow_target() {
+    local pkg_name="$1"
+    local pkg_dir="$DOTFILES_DIR/$pkg_name"
+    
+    # All packages stow to $HOME by default (package structure includes .config/...)
+    echo "$HOME"
+}
 
-stow_packages
-fix_permissions
-enable_user_services
-print_post_install
+# Check for conflicts before stowing
+check_stow_conflicts() {
+    local pkg_name="$1"
+    local target="$2"
+    local pkg_dir="$DOTFILES_DIR/$pkg_name"
+    
+    # Simulate stow to find conflicts
+    stow -n -t "$target" -d "$DOTFILES_DIR" "$pkg_name" 2>&1 | grep -i "conflict" >/dev/null 2>&1 || return 1
+}
 
-echoinfo "Done."
+# Perform stow for a single package
+stow_one_pkg() {
+    local pkg_name="$1"
+    local target="$2"
+    local pkg_dir="$DOTFILES_DIR/$pkg_name"
+    
+    if [[ ! -d "$pkg_dir" ]]; then
+        log_warn "Package directory not found: $pkg_dir"
+        return 1
+    fi
+    
+    log "Stowing package '$pkg_name' to '$target'..."
+    
+    # Check for conflicts
+    if check_stow_conflicts "$pkg_name" "$target"; then
+        log_warn "Potential conflicts detected for package '$pkg_name'"
+        if [[ "$FORCE" == false ]]; then
+            if ! prompt_confirm "Proceed with stowing '$pkg_name' - may overwrite existing files?"; then
+                log "Skipping $pkg_name"
+                return 1
+            fi
+        fi
+        
+        # Backup conflicting files
+        find "$pkg_dir" -type f -print0 2>/dev/null | while IFS= read -r -d '' file; do
+            local rel_path
+            rel_path="${file#$pkg_dir/}"
+            local target_file="$target/$rel_path"
+
+            if [[ -e "$target_file" && ! -L "$target_file" ]]; then
+                backup "$target_file"
+            fi
+        done
+    fi
+    
+    # Use stow -R (restow) for idempotency
+    if [[ "$DRY_RUN" == true ]]; then
+        log "  [DRY-RUN] stow -R -t '$target' -d '$DOTFILES_DIR' '$pkg_name'"
+        stow -n -R -t "$target" -d "$DOTFILES_DIR" "$pkg_name" 2>&1 | sed 's/^/    /'
+    else
+        stow -R -t "$target" -d "$DOTFILES_DIR" "$pkg_name"
+        log_success "Package '$pkg_name' stowed successfully"
+    fi
+}
+
+# ============================================================================
+# Oh My Zsh setup
+# ============================================================================
+
+setup_oh_my_zsh() {
+    log "Setting up Oh My Zsh..."
+    
+    local zsh_dir="$HOME/.oh-my-zsh"
+    
+    if [[ -d "$zsh_dir" ]]; then
+        log_success "Oh My Zsh already installed at $zsh_dir"
+    else
+        log "Cloning Oh My Zsh..."
+        
+        if [[ "$DRY_RUN" == true ]]; then
+            log "  [DRY-RUN] git clone https://github.com/ohmyzsh/ohmyzsh.git $zsh_dir"
+        else
+            git clone https://github.com/ohmyzsh/ohmyzsh.git "$zsh_dir" || log_error "Failed to clone Oh My Zsh"
+            log_success "Oh My Zsh cloned"
+        fi
+    fi
+    
+    # Install plugins
+    install_zsh_plugins
+}
+
+# Install Oh My Zsh plugins
+install_zsh_plugins() {
+    local zsh_custom="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+    local plugins_dir="$zsh_custom/plugins"
+    
+    mkdir -p "$plugins_dir"
+    
+    local plugins=("zsh-autosuggestions" "zsh-syntax-highlighting")
+    
+    for plugin in "${plugins[@]}"; do
+        local plugin_dir="$plugins_dir/$plugin"
+        
+        if [[ -d "$plugin_dir" ]]; then
+            log_success "Plugin '$plugin' already installed"
+        else
+            log "Installing plugin '$plugin'..."
+            
+            if [[ "$DRY_RUN" == true ]]; then
+                log "  [DRY-RUN] git clone https://github.com/zsh-users/$plugin.git $plugin_dir"
+            else
+                git clone "https://github.com/zsh-users/$plugin.git" "$plugin_dir" || log_error "Failed to install plugin '$plugin'"
+                log_success "Plugin '$plugin' installed"
+            fi
+        fi
+    done
+}
+
+# ============================================================================
+# Font setup
+# ============================================================================
+
+check_and_install_fonts() {
+    log "Checking for JetBrains Mono Nerd Font..."
+    
+    if fc-list 2>/dev/null | grep -i "jetbrains" > /dev/null 2>&1; then
+        log_success "JetBrains Mono Nerd Font is installed"
+        return 0
+    fi
+    
+    log_warn "JetBrains Mono Nerd Font not found"
+    
+    if [[ "$PKG_INSTALL" != true ]]; then
+        log_warn "Skipping font installation - use --pkg-install yes to install"
+        return 0
+    fi
+    
+    log "Attempting to install JetBrains Mono Nerd Font..."
+    
+    case "$PKG_MGR" in
+        paru|yay)
+            if [[ "$DRY_RUN" == true ]]; then
+                log "  [DRY-RUN] $PKG_MGR -S --noconfirm nerd-fonts-jetbrains-mono"
+            else
+                "$PKG_MGR" -S --noconfirm nerd-fonts-jetbrains-mono || log_warn "Failed to install font via $PKG_MGR"
+            fi
+            ;;
+        *)
+            log_warn "Automatic font installation not supported for $PKG_MGR. Please install manually."
+            ;;
+    esac
+    
+    if ! [[ "$DRY_RUN" == true ]]; then
+        log "Rebuilding font cache..."
+        fc-cache -f || log_warn "Failed to rebuild font cache"
+        log_success "Font cache rebuilt"
+    fi
+}
+
+# ============================================================================
+# Starship setup
+# ============================================================================
+
+setup_starship() {
+    log "Setting up Starship..."
+    
+    if ! command_exists starship; then
+        log_warn "starship is not installed"
+        if [[ "$PKG_INSTALL" == true ]]; then
+            log "Installing starship..."
+            case "$PKG_MGR" in
+                paru|yay|pacman)
+                    if [[ "$PKG_MGR" == "pacman" ]]; then
+                        if [[ "$DRY_RUN" == true ]]; then
+                            log "  [DRY-RUN] sudo pacman -S --noconfirm starship"
+                        else
+                            sudo pacman -S --noconfirm starship || log_warn "Failed to install starship"
+                        fi
+                    else
+                        if [[ "$DRY_RUN" == true ]]; then
+                            log "  [DRY-RUN] $PKG_MGR -S --noconfirm starship"
+                        else
+                            "$PKG_MGR" -S --noconfirm starship || log_warn "Failed to install starship"
+                        fi
+                    fi
+                    ;;
+                apt)
+                    if [[ "$DRY_RUN" == true ]]; then
+                        log "  [DRY-RUN] sudo apt-get install -y starship"
+                    else
+                        sudo apt-get update && sudo apt-get install -y starship || log_warn "Failed to install starship"
+                    fi
+                    ;;
+                dnf)
+                    if [[ "$DRY_RUN" == true ]]; then
+                        log "  [DRY-RUN] sudo dnf install -y starship"
+                    else
+                        sudo dnf install -y starship || log_warn "Failed to install starship"
+                    fi
+                    ;;
+                *)
+                    log_warn "Cannot auto-install starship on this system"
+                    return 1
+                    ;;
+            esac
+        else
+            log_warn "Skipping starship installation - use --pkg-install yes to install"
+            return 1
+        fi
+    fi
+    
+    log_success "starship is available"
+    
+    # Validate Starship config if present
+    if [[ -f "$HOME/.config/starship.toml" ]]; then
+        log "Starship config found at ~/.config/starship.toml"
+    fi
+}
+
+# ============================================================================
+# Post-install verification
+# ============================================================================
+
+verify_installation() {
+    log "Verifying installation..."
+    
+    # Check stowed files
+    log "Checking symlinks..."
+    
+    local check_paths=(
+        "$HOME/.zshrc"
+        "$HOME/.config/starship.toml"
+        "$HOME/.config/kitty/kitty.conf"
+        "$HOME/.config/hypr/hyprland.conf"
+    )
+    
+    for path in "${check_paths[@]}"; do
+        if [[ -L "$path" ]]; then
+            log_success "✓ $path - symlink"
+        elif [[ -e "$path" ]]; then
+            log "  $path - regular file"
+        fi
+    done
+    
+    # Test shell integration
+    if command_exists zsh; then
+        log "Testing Zsh integration..."
+        if [[ "$DRY_RUN" == true ]]; then
+            log "  [DRY-RUN] zsh check"
+        else
+            if zsh -ic 'echo $ZSH' 2>&1 | grep -q "oh-my-zsh"; then
+                log_success "Zsh and Oh My Zsh integration OK"
+            fi
+        fi
+    fi
+    
+    # Check fonts
+    if fc-list 2>/dev/null | grep -i "jetbrains" > /dev/null 2>&1; then
+        log_success "JetBrains Mono Nerd Font is installed"
+    else
+        log_warn "JetBrains Mono Nerd Font not found - optional"
+    fi
+}
+
+# ============================================================================
+# Main installation flow
+# ============================================================================
+
+main() {
+    log "==============================================="
+    log "Dotfiles Installation Script - GNU Stow-based"
+    log "==============================================="
+    log "Dotfiles directory: $DOTFILES_DIR"
+    log "Stow target: $STOW_TARGET"
+    [[ "$DRY_RUN" == true ]] && log "MODE: DRY-RUN - no changes will be made"
+    [[ "$FORCE" == true ]] && log "MODE: FORCE - backups and overwrite enabled"
+    log ""
+    
+    # Preflight
+    preflight_checks
+    
+    # Detect packages
+    detect_packages
+    
+    if [[ ${#PACKAGES_TO_STOW[@]} -eq 0 ]]; then
+        log_error "No packages detected to stow in $DOTFILES_DIR"
+        exit 1
+    fi
+    
+    log "Packages to stow: ${PACKAGES_TO_STOW[*]}"
+    log ""
+    
+    # Show planned stow commands
+    log "Planned stow commands:"
+    for pkg in "${PACKAGES_TO_STOW[@]}"; do
+        local target
+        target=$(get_stow_target "$pkg")
+        log "  stow -R -t '$target' -d '$DOTFILES_DIR' '$pkg'"
+    done
+    log ""
+    
+    # Prompt before proceeding
+    if ! prompt_confirm "Proceed with installation?"; then
+        log "Installation cancelled."
+        exit 0
+    fi
+    
+    # Create backup directory
+    mkdir -p "$BACKUP_DIR"
+    
+    # Stow all packages
+    for pkg in "${PACKAGES_TO_STOW[@]}"; do
+        local target
+        target=$(get_stow_target "$pkg")
+        stow_one_pkg "$pkg" "$target"
+    done
+    
+    log ""
+    log "Setting up additional components..."
+    
+    # Setup Oh My Zsh
+    setup_oh_my_zsh
+    
+    # Check and install fonts
+    check_and_install_fonts
+    
+    # Setup Starship
+    setup_starship
+    
+    log ""
+    
+    # Verify installation
+    if [[ "$DRY_RUN" != true ]]; then
+        verify_installation
+    fi
+    
+    # Summary
+    log ""
+    log "==============================================="
+    if [[ "$DRY_RUN" == true ]]; then
+        log_success "DRY-RUN completed successfully"
+    else
+        log_success "Installation completed successfully"
+    fi
+    log "==============================================="
+    
+    if [[ ${#BACKUPS_MADE[@]} -gt 0 ]]; then
+        log "Backups created:"
+        for backup in "${BACKUPS_MADE[@]}"; do
+            log "  - $backup"
+        done
+        log "Backups stored in: $BACKUP_DIR/$TIMESTAMP"
+    fi
+    
+    log ""
+    log "Post-installation steps:"
+    log "  1. Restart your shell: exec zsh"
+    log "  2. Reload Hyprland: hyprctl reload - if using Hyprland"
+    log "  3. Restart Kitty or open a new window"
+    log ""
+    log "To uninstall, run: ./uninstall.sh"
+    
+    if [[ -n "$LOG_FILE" ]]; then
+        log "Full log available at: $LOG_FILE"
+    fi
+}
+
+# ============================================================================
+# Argument parsing
+# ============================================================================
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            --force)
+                FORCE=true
+                shift
+                ;;
+            --yes)
+                YES_FLAG=true
+                shift
+                ;;
+            --pkg-install)
+                if [[ -z "${2:-}" ]]; then
+                    log_error "--pkg-install requires an argument: yes or no"
+                    exit 1
+                fi
+                case "$2" in
+                    yes) PKG_INSTALL=true ;;
+                    no) PKG_INSTALL=false ;;
+                    *) log_error "Invalid value for --pkg-install: $2"; exit 1 ;;
+                esac
+                shift 2
+                ;;
+            --target)
+                if [[ -z "${2:-}" ]]; then
+                    log_error "--target requires an argument: home, config, or both"
+                    exit 1
+                fi
+                case "$2" in
+                    home) STOW_TARGET="$HOME" ;;
+                    config) STOW_TARGET="$HOME/.config" ;;
+                    both) STOW_TARGET="$HOME" ;; # "both" is default behavior
+                    *) log_error "Invalid value for --target: $2"; exit 1 ;;
+                esac
+                shift 2
+                ;;
+            --log)
+                if [[ -z "${2:-}" ]]; then
+                    log_error "--log requires a file path"
+                    exit 1
+                fi
+                LOG_FILE="$2"
+                shift 2
+                ;;
+            --help|-h)
+                print_help
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                print_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+print_help() {
+    printf '%s\n' \
+        'Usage: ./install.sh [OPTIONS]' \
+        '' \
+        'GNU Stow-based dotfiles installer for Arch Linux + Hyprland/Kitty/Zsh.' \
+        '' \
+        'OPTIONS:' \
+        '  --dry-run              Show what would be done without making changes' \
+        '  --force                Overwrite existing files after creating backups' \
+        '  --yes                  Non-interactive mode; auto-confirm prompts' \
+        '  --pkg-install yes|no   Whether to install missing system packages' \
+        '  --target home|config|both' \
+        '                          Stow target: home (~), config (~/.config), or both' \
+        '  --log <file>           Append logs to specified file' \
+        '  -h, --help             Show this help message' \
+        '' \
+        'EXAMPLES:' \
+        '  # Dry-run to preview changes' \
+        '  ./install.sh --dry-run' \
+        '' \
+        '  # Full installation with package installs' \
+        '  ./install.sh --target both --pkg-install yes --log ~/install.log' \
+        '' \
+        '  # Force reinstall with auto-confirm' \
+        '  ./install.sh --force --yes' \
+        '' \
+        'BACKUP LOCATION:' \
+        '  ~/.local/share/dotfiles-backups/<YYYYMMDD_HHMMSS>/' \
+        '' \
+        'UNINSTALL:' \
+        '  ./uninstall.sh [--dry-run] [--restore-last] [--yes] [--log <file>]' \
+        ''
+}
+
+# ============================================================================
+# Entry point
+# ============================================================================
+
+parse_args "$@"
+main
