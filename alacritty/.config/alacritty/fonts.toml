@@ -1,0 +1,9 @@
+[font]
+size = 10
+
+builtin_box_drawing = true
+
+normal= { family= "FiraMonoNerdFont", style= "Regular" }
+bold = { family = "FiraMonoNerdFont", style = "Bold" }
+italic = { family = "FiraMonoNerdFont", style = "Italic" }
+bold_italic = { family = "FiraMonoNerdFont", style = "Bold Italic" }
