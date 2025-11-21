@@ -29,14 +29,14 @@ dotfiles/
 ├── hypr/                   # Hyprland configuration
 │   └── .config/
 │       └── hypr/
-│           ├── hyprland.conf
-│           ├── keybindings.conf
-│           └── ...
 ├── kitty/                  # Kitty terminal configuration
-│   └── .config/
-│       └── kitty/
-│           ├── kitty.conf
-│           └── ...
+├── alacritty/              # Alacritty terminal configuration
+├── nvim/                   # Neovim configuration
+├── tmux/                   # Tmux configuration
+├── btop/                   # Btop system monitor
+├── lazygit/                # Lazygit configuration
+├── ranger/                 # Ranger file manager
+├── vscode/                 # VS Code settings & extensions
 └── starship/               # Starship prompt configuration
     └── .config/
         └── starship.toml
@@ -460,6 +460,13 @@ stow -n -t ~ zshrc | head -20
 These scripts are provided as-is for personal use. Adjust as needed for your system.
 
 ## Changelog
+
+### v1.1 (2025-11-21)
+
+- Added support for additional packages: `nvim`, `tmux`, `alacritty`, `btop`, `lazygit`, `fuzzel`, `neofetch`, `ranger`, `vscode`
+- Updated `install.sh` with automated package detection logic
+- Updated `uninstall.sh` with single-package unstow support (`--package`)
+- Migrated configurations to separate package directories
 
 ### v1.0 (2025-11-20)
 
