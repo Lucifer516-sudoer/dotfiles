@@ -1,0 +1,57 @@
+HYPRLAND KEYBIND CHEATSHEET
+──────────────────────────
+
+LAUNCHERS
+─────────
+SUPER + Q        → Terminal
+SUPER + E        → File Manager
+SUPER + R        → App Launcher
+SUPER + V        → Clipboard Manager
+
+WINDOW MANAGEMENT
+─────────────────
+SUPER + C        → Kill active window
+SUPER + F        → Fullscreen
+SUPER + SHIFT+V  → Toggle floating
+SUPER + P        → Pseudo (dwindle)
+SUPER + T        → Toggle split
+
+FOCUS (VIM STYLE)
+────────────────
+SUPER + H/J/K/L  → Move focus
+SUPER + ←↑↓→     → Move focus (arrows)
+
+MOVE WINDOWS
+────────────
+SUPER + SHIFT + H/J/K/L → Move window
+
+RESIZE WINDOWS
+──────────────
+SUPER + CTRL + H/J/K/L → Resize window
+SUPER + CTRL + ←↑↓→   → Resize window
+
+WORKSPACES
+──────────
+SUPER + 1–9,0        → Switch workspace
+SUPER + SHIFT + 1–9 → Move window to workspace
+
+SCRATCHPAD
+──────────
+SUPER + S        → Toggle scratchpad
+SUPER + SHIFT+S  → Send window to scratchpad
+
+SYSTEM
+──────
+SUPER + SHIFT+C → Color picker
+SUPER + SHIFT+E → Logout menu
+SUPER + N       → Clear notifications
+Print           → Screenshot
+
+MEDIA
+─────
+Volume / Brightness keys
+Media keys → Player control
+
+HELP
+────
+SUPER + SHIFT + ? → Show this help
