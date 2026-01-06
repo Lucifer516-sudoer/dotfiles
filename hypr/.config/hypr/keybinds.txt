@@ -7,6 +7,7 @@ SUPER + Q        → Terminal
 SUPER + E        → File Manager
 SUPER + R        → App Launcher
 SUPER + V        → Clipboard Manager
+SUPER + CTRL + C → Open Dotfiles in Code
 
 WINDOW MANAGEMENT
 ─────────────────
