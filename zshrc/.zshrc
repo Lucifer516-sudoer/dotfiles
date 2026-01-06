@@ -19,3 +19,9 @@ source $ZSH/oh-my-zsh.sh
 
 # load Starship
 eval "$(starship init zsh)"
+eval "$(ty generate-shell-completion zsh)"
+
+fpath+=~/.zfunc; autoload -Uz compinit; compinit
+
+# Turso
+export PATH="$PATH:/home/lucifer/.turso"
