@@ -1,4 +1,4 @@
-antigravity-preview
+antigravity
 apache-tools
 awww-git
 bfg
