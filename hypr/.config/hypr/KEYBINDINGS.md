@@ -1,7 +1,7 @@
 # Hyprland Keybindings Reference
 
 ## Basic Applications
-- `SUPER + Q` - Launch terminal (Kitty)
+- `SUPER + Q` - Launch terminal (Kitty) or Ghostty
 - `SUPER + E` - File manager (Thunar)
 - `SUPER + R` - Application launcher (Rofi)
 - `SUPER + C` - Close active window

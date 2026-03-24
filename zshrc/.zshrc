@@ -15,7 +15,7 @@ plugins=(
 )
 
 source $ZSH/oh-my-zsh.sh
-
+source /home/lucifer/.zshenv
 
 # load Starship
 eval "$(starship init zsh)"
@@ -25,3 +25,5 @@ fpath+=~/.zfunc; autoload -Uz compinit; compinit
 
 # Turso
 export PATH="$PATH:/home/lucifer/.turso"
+
+alias mkdchd="mkdir  $(date +"%B-%d-%Y") && cd $(date +"%B-%d-%Y")"
