@@ -27,3 +27,5 @@ fpath+=~/.zfunc; autoload -Uz compinit; compinit
 export PATH="$PATH:/home/lucifer/.turso"
 
 alias mkdchd="mkdir  $(date +"%B-%d-%Y") && cd $(date +"%B-%d-%Y")"
+
+[[ "$TERM_PROGRAM" == "kiro" ]] && . "$(kiro --locate-shell-integration-path zsh)"
