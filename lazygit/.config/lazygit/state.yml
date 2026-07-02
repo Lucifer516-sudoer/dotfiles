@@ -1,7 +1,11 @@
 lastupdatecheck: 0
 recentrepos:
-- /home/peter/Repos/dots
-- /home/peter/Repos/PersonalProjects/startpage
+    - /home/lucifer/dev/temp/Digital-Nurture-JavaFSE
 startuppopupversion: 5
-customcommandshistory: []
+didshowhunkstaginghint: false
+lastversion: 0.62.2
+customcommandshistory:
+    - ls
+    - w
 hidecommandlog: true
+githubPullRequests: {}

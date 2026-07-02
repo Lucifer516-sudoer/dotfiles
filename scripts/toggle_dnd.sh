@@ -11,6 +11,11 @@ if [[ "$dnd_status" == "true" ]]; then
     notify-send -u normal "Do Not Disturb" "Turning OFF DND mode" -t 2000
 else
     # DND is currently OFF, notify before turning ON
+    # I just now saw, that when we turn on the DND, 
+    # the previous notifications stays, and thats not a appropriate 
+    # behaviour
+    swaync-client --close-all
+    sleep 0.5
     notify-send -u normal "Do Not Disturb" "Turning ON DND mode" -t 2000
     sleep 0.5
     swaync-client -d
