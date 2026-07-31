@@ -1,9 +1,10 @@
 lastupdatecheck: 0
 recentrepos:
-    - /home/lucifer/dev/temp/Digital-Nurture-JavaFSE
+    - /home/lucifer/Journalling and stuffs/NoteBook
+    - /home/lucifer/dev/projects/Digital-Nurture-JavaFSE
 startuppopupversion: 5
 didshowhunkstaginghint: false
-lastversion: 0.62.2
+lastversion: 0.63.1
 customcommandshistory:
     - ls
     - w
