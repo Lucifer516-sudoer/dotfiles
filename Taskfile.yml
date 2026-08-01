@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+
+tasks:
+  default:
+    desc: Lists all the available commands
+    cmds:
+      - go-task --list
+    silent: true
+
+  run:
+    desc: Runs the bootstrap script
+    cmds:
+      - |
+        cd {{.ROOT_DIR}}
+        python -m bootstrap.main

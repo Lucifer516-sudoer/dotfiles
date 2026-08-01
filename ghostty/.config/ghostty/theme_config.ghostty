@@ -1,0 +1,64 @@
+# =========================
+# UI
+# =========================
+
+background = #1a1110
+foreground = #f1dedc
+
+selection-background = #5d3f3c
+selection-foreground = #ffdad6
+
+cursor-color = #ffb3ac
+cursor-text = #571e1a
+
+# =========================
+# ANSI Palette
+# =========================
+
+# Black
+#palette = 0=#231918
+
+# Red
+#palette = 1=#ffb4ab
+
+# Green
+#palette = 2=#ffb3ac
+
+# Yellow
+#palette = 3=#e1c38c
+
+# Blue
+#palette = 4=#e7bdb8
+
+# Magenta
+#palette = 5=#73332f
+
+# Cyan
+#palette = 6=#5d3f3c
+
+# White
+#palette = 7=#f1dedc
+
+# Bright Black
+#palette = 8=#322826
+
+# Bright Red
+#palette = 9=#93000a
+
+# Bright Green
+#palette = 10=#ffdad6
+
+# Bright Yellow
+#palette = 11=#fedea6
+
+# Bright Blue
+#palette = 12=#ffdad6
+
+# Bright Magenta
+#palette = 13=#ffb3ac
+
+# Bright Cyan
+#palette = 14=#e7bdb8
+
+# Bright White
+#palette = 15=#423735
