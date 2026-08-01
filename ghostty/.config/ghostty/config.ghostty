@@ -3,6 +3,7 @@
 theme = iTerm2 Solarized Dark
 background = #23262e
 foreground = #ffca28
+background-opacity = 0.86
 selection-background = #292e38
 selection-foreground = #00e8c6
 cursor-color = #ee5d43
@@ -24,5 +25,3 @@ palette = 13=#ee5d43
 palette = 14=#03d6b8
 palette = 15=#c74ded
 font-size = 15
-
-
