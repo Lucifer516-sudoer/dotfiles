@@ -1,0 +1,17 @@
+* {
+    border: none;
+    border-radius: 0;
+    font-family: JetBrainsMono Nerd Font;
+    font-size: 15px;
+}
+
+window#waybar {
+    background: rgba(20, 20, 20, 0.95);
+    color: white;
+}
+
+#clock,
+#battery,
+#workspaces {
+    padding: 0 12px;
+}
