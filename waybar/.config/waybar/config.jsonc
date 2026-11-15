@@ -1,20 +1,130 @@
 {
+    "reload_style_on_change": true,
     "layer": "top",
     "position": "top",
-    "height": 36,
+    "height": 44,
+    "spacing": 8,
     "modules-left": [
-        "hyprland/workspaces"
-    ],
-    "modules-center": [
+        "custom/launcher",
+        "hyprland/workspaces",
         "hyprland/window"
     ],
+    "modules-center": [
+        "clock#time"
+    ],
     "modules-right": [
+        "backlight",
         "pulseaudio",
         "network",
-        "battery",
-        "clock"
+        "temperature",
+        "disk",
+        "battery"
     ],
-    "clock": {
-        "format": "{:%a %d %b  %H:%M}"
+    "disk": {
+        "path": "/",
+        "format": "{percentage_used}% 💾"
+    },
+    "temperature": {
+        "hwmon-path-abs": "/sys/devices/platform/coretemp.0/hwmon",
+        "input-filename": "temp1_input",
+        "critical-threshold": 50,
+        "format": "{temperatureC}°C ",
+        "format-critical": "{temperatureC}°C "
+    },
+    "clock#time": {
+        "format": "{:%a %d %b  %I:%M %p}",
+        "tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>"
+    },
+    "custom/launcher": {
+        "format": "",
+        "tooltip": false,
+        "on-click": "fuzzel"
+    },
+    "hyprland/window": {
+        "format": "󰣆  {}",
+        "max-length": 36,
+        "separate-outputs": true
+    },
+    "hyprland/workspaces": {
+        "disable-scroll": false,
+        "all-outputs": false,
+        "on-click": "hyprctl dispatch workspace {name}",
+        "format": "{name}",
+        "persistent-workspaces": {
+            "*": 5
+        },
+        // Fix: Using the correct Hyprland Lua IPC syntax for relative scrolling
+        "on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"+1\" })'",
+        "on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"-1\" })'"
+    },
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-muted": "󰖁 muted",
+        "format-icons": {
+            "default": [
+                "",
+                "",
+                ""
+            ]
+        },
+        "scroll-step": 5,
+        "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+    },
+    "network": {
+        "format-wifi": "  {signalStrength}%",
+        "format-ethernet": "󰈀  wired",
+        "format-disconnected": "󰖪  offline",
+        "tooltip-format-wifi": "{essid}\n{ipaddr}",
+        "tooltip-format-ethernet": "{ifname}\n{ipaddr}"
+    },
+    "battery": {
+        "interval": 30,
+        "states": {
+            "warning": 30,
+            "critical": 15
+        },
+        "format": "{icon} {capacity}%",
+        "format-charging": "󰂄 {capacity}%",
+        "format-plugged": " {capacity}%",
+        "format-icons": [
+            "󰂎",
+            "󰁺",
+            "󰁻",
+            "󰁼",
+            "󰁽",
+            "󰁾",
+            "󰁿",
+            "󰂀",
+            "󰂁",
+            "󰂂",
+            "󰁹"
+        ],
+        "tooltip-format": "{timeTo} · {power:.1f} W"
+    },
+    "tray": {
+        "icon-size": 16,
+        "spacing": 8
+    },
+    "backlight": {
+        "device": "intel_backlight",
+        "format": "{icon} {percent}%",
+        "format-icons": [
+            "😴",
+            "🛌",
+            "💤",
+            "☕",
+            "🫖",
+            "🥤",
+            "🧉",
+            "⚡",
+            "🏎️",
+            "🚀",
+            "🛸",
+            "💥",
+            "🤯"
+        ],
+        "on-scroll-up": "brightnessctl set +5% -e",
+        "on-scroll-down": "brightnessctl set 5%- -e",
+        "smooth-scrolling-threshold": 1.5
     }
 }

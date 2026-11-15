@@ -1,0 +1,16 @@
+[config]
+fallback_color = "#7aa2f7"
+prefer = "saturation"
+
+[templates.waybar]
+input_path = "./templates/waybar-colors.css.tmpl"
+output_path = "~/.config/waybar/colors.css"
+post_hook = "pkill -SIGUSR2 waybar || true"
+
+[templates.rofi-wallpaper]
+input_path = "~/.config/matugen/templates/rofi-wallpaper.rasi"
+output_path = "~/.config/rofi/wallpaper.rasi"
+
+[templates.fuzzel]
+input_path = "~/.config/matugen/templates/fuzzel.ini"
+output_path = "~/.config/fuzzel/fuzzel.ini"

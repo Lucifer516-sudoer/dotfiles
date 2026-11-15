@@ -1,17 +1,166 @@
+@import "colors.css";
+
+/* Local palette for temperature states */
+@define-color temp_ok #a6e3a1;
+@define-color temp_critical #f38ba8;
+@define-color temp_critical_text #ffffff;
+
+/* ---------- Base ---------- */
+
 * {
     border: none;
     border-radius: 0;
-    font-family: JetBrainsMono Nerd Font;
-    font-size: 15px;
+    min-height: 0;
+    font-family: "JetBrainsMono Nerd Font";
+    font-size: 14px;
+    font-weight: 500;
 }
 
 window#waybar {
-    background: rgba(20, 20, 20, 0.95);
-    color: white;
+    background: transparent;
+    color: @foreground;
 }
 
-#clock,
+tooltip {
+    background: @background;
+    color: @foreground;
+    border: 1px solid @outline;
+    border-radius: 10px;
+}
+
+tooltip label {
+    padding: 8px;
+}
+
+/* ---------- Bar containers ---------- */
+
+.modules-left,
+.modules-right,
+#clock.time {
+    background: alpha(@module_bg, 0.94);
+    border: 1px solid alpha(@outline, 0.35);
+    border-radius: 11px;
+}
+
+.modules-left,
+.modules-right {
+    color: @module_fg;
+    margin: 6px 8px;
+    padding: 0 6px;
+}
+
+.modules-center {
+    background: transparent;
+    margin: 6px 0;
+}
+
+/* ---------- Modules ---------- */
+
 #battery,
-#workspaces {
+#network,
+#pulseaudio,
+#tray {
+    padding: 0 11px;
+}
+
+#custom-launcher {
+    min-width: 30px;
+    margin: 3px 5px 3px 0;
+    padding: 0 2px;
+    border-radius: 8px;
+    background: @primary_container;
+    color: @on_primary_container;
+    font-size: 17px;
+}
+
+#window {
+    min-width: 150px;
+    margin-left: 6px;
     padding: 0 12px;
+    background: transparent;
+    color: @module_fg;
+}
+
+#clock.time {
+    min-width: 174px;
+    padding: 0 16px;
+    color: @primary;
+    font-weight: 700;
+}
+
+#network.disconnected,
+#pulseaudio.muted {
+    color: @muted;
+}
+
+#battery.warning {
+    color: @secondary;
+}
+
+#battery.critical {
+    color: @error;
+}
+
+#temperature {
+    padding: 0 10px;
+    color: @temp_ok;
+}
+
+#temperature.critical {
+    color: @temp_critical;
+    animation-name: blink;
+    animation-duration: 0.5s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+}
+
+/* ---------- Workspaces ---------- */
+
+#workspaces {
+    background: transparent;
+    padding: 0 3px;
+}
+
+#workspaces button {
+    min-width: 8px;
+    min-height: 8px;
+    margin: 11px 4px;
+    padding: 0;
+    color: transparent;
+    font-size: 0;
+    border-radius: 999px;
+    background: alpha(@muted, 0.32);
+    transition:
+        min-width 160ms ease,
+        background-color 160ms ease;
+}
+
+#workspaces button label {
+    min-height: 0;
+    padding: 0;
+    font-size: 0;
+}
+
+#workspaces button:hover {
+    background: alpha(@tertiary, 0.75);
+    box-shadow: inherit;
+}
+
+#workspaces button.active {
+    min-width: 24px;
+    background: @primary;
+}
+
+#workspaces button.urgent {
+    background: @error;
+}
+
+/* ---------- Animation ---------- */
+
+@keyframes blink {
+    to {
+        background-color: alpha(@temp_critical, 0.5);
+        color: @temp_critical_text;
+    }
 }

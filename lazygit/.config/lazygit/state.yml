@@ -1,12 +1,13 @@
 lastupdatecheck: 0
 recentrepos:
+    - /home/lucifer/dev/projects/personal/hobby/books_manager
     - /home/lucifer/Journalling and stuffs/NoteBook
     - /home/lucifer/dev/projects/Digital-Nurture-JavaFSE
 startuppopupversion: 5
 didshowhunkstaginghint: false
-lastversion: 0.63.1
+lastversion: 0.64.1
 customcommandshistory:
+    - git remote add origin git@github.com:Lucifer516-sudoer/books_manager.git
     - ls
     - w
 hidecommandlog: true
-githubPullRequests: {}

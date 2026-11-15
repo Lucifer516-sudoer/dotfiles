@@ -1,0 +1,72 @@
+
+* {
+    text-color: {{colors.on_surface.default.hex}};
+    background-color: {{colors.surface.default.hex}};
+}
+
+window {
+    width: 85%;
+    location: center;
+    anchor: center;
+    border: 2px;
+    border-color: {{colors.primary.default.hex}};
+    border-radius: 16px;
+    background-color: {{colors.surface.default.hex}}F0;
+    padding: 16px;
+}
+
+mainbox {
+    children: [ inputbar, listview ];
+    spacing: 12px;
+}
+
+inputbar {
+    children: [ prompt, entry ];
+    spacing: 10px;
+    padding: 10px;
+    background-color: {{colors.surface_container.default.hex}};
+    border-radius: 8px;
+}
+
+prompt {
+    text-color: {{colors.primary.default.hex}};
+}
+
+entry {
+    text-color: {{colors.on_surface.default.hex}};
+}
+
+listview {
+    columns: 5;
+    lines: 1;
+    fixed-columns: true;
+    flow: horizontal;
+    layout: vertical;
+    spacing: 12px;
+    scrollbar: false;
+}
+
+element {
+    orientation: vertical;
+    children: [ element-icon, element-text ];
+    padding: 8px;
+    background-color: {{colors.surface_container.default.hex}};
+    border-radius: 10px;
+}
+
+element selected {
+    background-color: {{colors.primary_container.default.hex}};
+    border: 2px;
+    border-color: {{colors.primary.default.hex}};
+}
+
+element-icon {
+    size: 200px;
+    horizontal-align: 0.5;
+}
+
+element-text {
+    horizontal-align: 0.5;
+    padding: 8px;
+    text-color: {{colors.on_surface.default.hex}};
+}

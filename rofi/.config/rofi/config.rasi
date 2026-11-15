@@ -1,0 +1,5 @@
+@theme "~/.config/rofi/wallpaper.rasi"
+
+configuration {
+    show-icons: true;
+}

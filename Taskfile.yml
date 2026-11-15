@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+tasks:
+  waybar:
+    watch: true
+    method: none
+    sources:
+      - "{{.HOME}}/.config/waybar/config.jsonc"
+      - "{{.HOME}}/.config/waybar/style.css"
+    cmds:
+      - |
+        pkill waybar || true
+        nohup waybar >/dev/null 2>&1 &
